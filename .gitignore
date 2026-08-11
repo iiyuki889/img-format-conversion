@@ -22,7 +22,8 @@ target
 
 .vscode/
 sample_img/
-
+input_img/
+output_img/
 
 # Added by cargo
 
