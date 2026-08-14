@@ -148,6 +148,8 @@ struct MyApp {
     selected_file: Option<PathBuf>,
     texture: Option<egui::TextureHandle>,
     selected_format: ConvertFormat,
+    selected_img: Option<image::DynamicImage>,
+    output_img: Option<image::DynamicImage>,
 }
 
 #[derive(Default, PartialEq)]
@@ -161,8 +163,9 @@ enum ConvertFormat {
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ui, |ui| {
-            ui.heading("画像変換ツール");
+            ui.heading("Image converter tool");
 
+            // selcet image format
             egui::ComboBox::from_label("に変換")
                 .selected_text(match self.selected_format {
                     ConvertFormat::Jpeg => "jpeg",
@@ -171,18 +174,26 @@ impl eframe::App for MyApp {
                 })
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Jpeg, "jpg");
-                    ui.selectable_value(&mut self.selected_format,ConvertFormat::Png, "png");
+                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Png, "png");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
                 });
 
+            // open folder
             if ui.button("Dialog").clicked() {
                 if let Some(path) = rfd::FileDialog::new()
                     .add_filter("Image", &["jpg", "jpeg", "png", "webp"])
                     .pick_file()
                 {
                     self.texture = load_image(ui.ctx(), &path);
-                    self.selected_file = Some(path);
+                    self.selected_file = Some(path.clone());
+                    if let Ok(image) = image::open(&path) {
+                        self.selected_img = Some(image);
+                    }
                 }
+            }
+            if let Some(texture) = &self.texture {
+                let image = egui::Image::new(texture).shrink_to_fit();
+                ui.add(image);
             }
         });
     }
