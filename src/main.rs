@@ -169,8 +169,8 @@ impl eframe::App for MyApp {
             ui.heading("Image converter tool");
 
             // open folder
-            if ui.button("Open faile").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button("Open faile").clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter("Image", &["jpg", "jpeg", "png", "webp"])
                     .pick_file()
                 {
@@ -214,7 +214,6 @@ impl eframe::App for MyApp {
                         }
                     }
                 }
-            }
             if let Some(texture) = &self.texture {
                 let image = egui::Image::new(texture).shrink_to_fit();
                 ui.add(image);
@@ -246,8 +245,8 @@ impl eframe::App for MyApp {
 
             let convert_button = ui.add_enabled(convert_enabled, egui::Button::new("変換開始"));
 
-            if convert_button.clicked() {
-                if let Some(image) = &self.selected_img {
+            if convert_button.clicked()
+                && let Some(image) = &self.selected_img {
                     let (extension, image_format) = match self.selected_format {
                         ConvertFormat::Jpeg => ("jpg", ImageFormat::Jpeg),
                         ConvertFormat::Png => ("png", ImageFormat::Png),
@@ -262,56 +261,55 @@ impl eframe::App for MyApp {
                         .save_file()
                     {
                         match image.save_with_format(&output_path, image_format) {
-    Ok(()) => {
-        if self.remove_metadata_enabled {
-            if let Some(output_path_str) = output_path.to_str() {
-                match remove_tags(output_path_str) {
-                    Ok(()) => {
-                        let message = format!(
-                            "画像を変換し、メタデータを消去しました: {}",
-                            output_path.display()
-                        );
+                            Ok(()) => {
+                                if self.remove_metadata_enabled {
+                                    if let Some(output_path_str) = output_path.to_str() {
+                                        match remove_tags(output_path_str) {
+                                            Ok(()) => {
+                                                let message = format!(
+                                                    "画像を変換し、メタデータを消去しました: {}",
+                                                    output_path.display()
+                                                );
 
-                        println!("{message}");
-                        self.status_message = message;
-                    }
-                    Err(error) => {
-                        let message = format!(
-                            "画像は変換しましたが、メタデータの消去に失敗しました: {error}"
-                        );
+                                                println!("{message}");
+                                                self.status_message = message;
+                                            }
+                                            Err(error) => {
+                                                let message = format!(
+                                                    "画像は変換しましたが、メタデータの消去に失敗しました: {error}"
+                                                );
 
-                        eprintln!("{message}");
-                        self.status_message = message;
+                                                eprintln!("{message}");
+                                                self.status_message = message;
+                                            }
+                                        }
+                                    } else {
+                                        let message =
+                                            "保存先のパスを文字列へ変換できませんでした".to_string();
+
+                                        eprintln!("{message}");
+                                        self.status_message = message;
+                                    }
+                                } else {
+                                    let message = format!(
+                                        "画像の変換が完了しました: {}",
+                                        output_path.display()
+                                    );
+
+                                    println!("{message}");
+                                    self.status_message = message;
+                                }
+                            }
+                            Err(error) => {
+                                let message =
+                                    format!("画像の変換に失敗しました: {error}");
+
+                                eprintln!("{message}");
+                                self.status_message = message;
+                            }
+                        }
                     }
                 }
-            } else {
-                let message =
-                    "保存先のパスを文字列へ変換できませんでした".to_string();
-
-                eprintln!("{message}");
-                self.status_message = message;
-            }
-        } else {
-            let message = format!(
-                "画像の変換が完了しました: {}",
-                output_path.display()
-            );
-
-            println!("{message}");
-            self.status_message = message;
-        }
-    }
-    Err(error) => {
-        let message =
-            format!("画像の変換に失敗しました: {error}");
-
-        eprintln!("{message}");
-        self.status_message = message;
-    }
-}
-                    }
-                }
-            }
 
             if !self.status_message.is_empty() {
                 ui.separator();
