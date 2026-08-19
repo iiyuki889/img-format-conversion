@@ -151,7 +151,7 @@ struct MyApp {
     selected_format: ConvertFormat,
     selected_img: Option<image::DynamicImage>,
     selected_img_format: Option<ImageFormat>,
-
+    remove_metadata_enabled: bool,
     status_message: String,
 }
 
@@ -203,8 +203,15 @@ impl eframe::App for MyApp {
                     self.texture = load_image(ui.ctx(), &path);
                     self.selected_file = Some(path.clone());
 
-                    if let Ok(image) = image::open(&path) {
-                        self.selected_img = Some(image);
+                    match image::open(&path) {
+                        Ok(image) => {
+                            self.selected_img = Some(image);
+                            self.status_message = format!("画像を開きました: {}", path.display());
+                        }
+                        Err(error) => {
+                            self.selected_img = None;
+                            self.status_message = format!("画像を開けませんでした: {error}");
+                        }
                     }
                 }
             }
@@ -230,6 +237,11 @@ impl eframe::App for MyApp {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
                 });
 
+            ui.checkbox(
+                &mut self.remove_metadata_enabled,
+                "変換後にメタデータを消去する",
+            );
+
             let convert_enabled = self.selected_img.is_some();
 
             let convert_button = ui.add_enabled(convert_enabled, egui::Button::new("変換開始"));
@@ -250,15 +262,60 @@ impl eframe::App for MyApp {
                         .save_file()
                     {
                         match image.save_with_format(&output_path, image_format) {
-                            Ok(()) => {
-                                println!("画像変換が完了: {}", output_path.display());
-                            }
-                            Err(error) => {
-                                eprint!("画像の変換に失敗しました: {error}");
-                            }
-                        }
+    Ok(()) => {
+        if self.remove_metadata_enabled {
+            if let Some(output_path_str) = output_path.to_str() {
+                match remove_tags(output_path_str) {
+                    Ok(()) => {
+                        let message = format!(
+                            "画像を変換し、メタデータを消去しました: {}",
+                            output_path.display()
+                        );
+
+                        println!("{message}");
+                        self.status_message = message;
+                    }
+                    Err(error) => {
+                        let message = format!(
+                            "画像は変換しましたが、メタデータの消去に失敗しました: {error}"
+                        );
+
+                        eprintln!("{message}");
+                        self.status_message = message;
                     }
                 }
+            } else {
+                let message =
+                    "保存先のパスを文字列へ変換できませんでした".to_string();
+
+                eprintln!("{message}");
+                self.status_message = message;
+            }
+        } else {
+            let message = format!(
+                "画像の変換が完了しました: {}",
+                output_path.display()
+            );
+
+            println!("{message}");
+            self.status_message = message;
+        }
+    }
+    Err(error) => {
+        let message =
+            format!("画像の変換に失敗しました: {error}");
+
+        eprintln!("{message}");
+        self.status_message = message;
+    }
+}
+                    }
+                }
+            }
+
+            if !self.status_message.is_empty() {
+                ui.separator();
+                ui.label(&self.status_message);
             }
         });
     }
