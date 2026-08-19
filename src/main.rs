@@ -1,9 +1,7 @@
 use eframe::egui;
 use exiftool_rs::ExifTool;
 use image::ImageFormat;
-use std::env;
-use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::result::Result::Ok;
 
 fn main() -> eframe::Result {
@@ -18,49 +16,6 @@ fn main() -> eframe::Result {
         }),
     );
     Ok(())
-}
-
-// convert jpeg and png to webp
-fn convert_image() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 3 {
-        eprintln!(
-            "画像ファイルと出力方式を指定してください(cargo run -- <img path> <output path> <format>"
-        );
-        return Ok(());
-    }
-
-    let input_img = &args[1];
-    let format_str = &args[2].to_lowercase();
-
-    let output_format = match format_str.as_str() {
-        "jpg" | "jpeg" => ImageFormat::Jpeg,
-        "png" => ImageFormat::Png,
-        "webp" => ImageFormat::WebP,
-        _ => {
-            eprintln!("対応していないフォーマットです: {format_str}");
-            return Ok(());
-        }
-    };
-
-    let output_path = make_output_path(input_img, format_str);
-
-    let img = image::open(input_img)?;
-    println!("{}", "-".repeat(30));
-    println!("画像の読み込みに成功");
-    img.save_with_format(&output_path, output_format)?;
-    println!("変換完了");
-    println!("{}", "-".repeat(30));
-    let _ = remove_tags(&output_path);
-    let _ = tags_check(&output_path);
-    Ok(())
-}
-
-fn make_output_path(input_img: &str, extension: &str) -> String {
-    let mut output = Path::new(input_img).to_path_buf();
-    output.set_extension(extension);
-    output.to_string_lossy().into_owned()
 }
 
 // remove photo metadata
@@ -89,25 +44,12 @@ fn remove_tags(input_img: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// check deleted metadata
-fn tags_check(output_img: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let exiftool = ExifTool::new();
-    let tags = match exiftool.extract_info(output_img) {
-        Ok(tags) => tags,
-        Err(error) => {
-            eprintln!("メタデータの取得に失敗しました: {error}");
-            return Ok(());
-        }
-    };
-    println!("{}", "-".repeat(30));
-    println!("消去できたかチェック");
-    for tag in &tags {
-        if tag.name.starts_with("GPS") {
-            println!("{}: {}", tag.name, tag.print_value);
-        }
-    }
-    println!("{}", "-".repeat(30));
-    Ok(())
+fn load_texture(ctx: &egui::Context, image: &image::DynamicImage) -> egui::TextureHandle {
+    let rgba = image.to_rgba8();
+    let size = [rgba.width() as usize, rgba.height() as usize];
+    let color_image = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+
+    ctx.load_texture("sekected-img", color_image, egui::TextureOptions::default())
 }
 
 // -------- GUI --------
@@ -130,18 +72,6 @@ fn setup_fonts(ctx: &egui::Context) {
         .insert(0, "japanese".to_owned());
 
     ctx.set_fonts(fonts);
-}
-
-fn load_image(ctx: &egui::Context, path: &PathBuf) -> Option<egui::TextureHandle> {
-    let image = image::open(path).ok()?;
-    let image = image.to_rgba8();
-    let size = [image.width() as usize, image.height() as usize];
-
-    let pixels = image.as_raw();
-
-    let color_image = egui::ColorImage::from_rgba_unmultiplied(size, pixels);
-
-    Some(ctx.load_texture("selected-img", color_image, egui::TextureOptions::default()))
 }
 
 #[derive(Default)]
@@ -196,19 +126,18 @@ impl eframe::App for MyApp {
                         println!("画像フォーマットを判定できません");
                     }
 
-                    // 画像フォーマットの文字列の保存
-                    self.selected_img_format = reader.format();
-
-                    // 画像を表示
-                    self.texture = load_image(ui.ctx(), &path);
-                    self.selected_file = Some(path.clone());
-
                     match image::open(&path) {
                         Ok(image) => {
+                            //画像の表示
+                            self.texture = Some(load_texture(ui.ctx(), &image));
+                            self.selected_file = Some(path.clone());
                             self.selected_img = Some(image);
+                            // 画像フォーマットの文字列の保存
+                            self.selected_img_format = reader.format();
                             self.status_message = format!("画像を開きました: {}", path.display());
                         }
                         Err(error) => {
+                            self.texture = None;
                             self.selected_img = None;
                             self.status_message = format!("画像を開けませんでした: {error}");
                         }
