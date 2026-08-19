@@ -4,6 +4,7 @@ use image::ImageFormat;
 use std::env;
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::result::Result::Ok;
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions::default();
@@ -149,10 +150,12 @@ struct MyApp {
     texture: Option<egui::TextureHandle>,
     selected_format: ConvertFormat,
     selected_img: Option<image::DynamicImage>,
-    output_img: Option<image::DynamicImage>,
+    selected_img_format: Option<ImageFormat>,
+
+    status_message: String,
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Clone, Copy)]
 enum ConvertFormat {
     #[default]
     Jpeg,
@@ -165,8 +168,57 @@ impl eframe::App for MyApp {
         egui::CentralPanel::default().show(ui, |ui| {
             ui.heading("Image converter tool");
 
+            // open folder
+            if ui.button("Open faile").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("Image", &["jpg", "jpeg", "png", "webp"])
+                    .pick_file()
+                {
+                    let reader = match image::ImageReader::open(&path) {
+                        Ok(reader) => reader,
+                        Err(error) => {
+                            eprintln!("ファイルを開けません: {error}");
+                            return;
+                        }
+                    };
+
+                    let reader = match reader.with_guessed_format() {
+                        Ok(reader) => reader,
+                        Err(error) => {
+                            eprint!("画像形式を判定できません: {error}");
+                            return;
+                        }
+                    };
+
+                    if let Some(format) = reader.format() {
+                        println!("画像フォーマット: {format:?}");
+                    } else {
+                        println!("画像フォーマットを判定できません");
+                    }
+
+                    // 画像フォーマットの文字列の保存
+                    self.selected_img_format = reader.format();
+
+                    // 画像を表示
+                    self.texture = load_image(ui.ctx(), &path);
+                    self.selected_file = Some(path.clone());
+
+                    if let Ok(image) = image::open(&path) {
+                        self.selected_img = Some(image);
+                    }
+                }
+            }
+            if let Some(texture) = &self.texture {
+                let image = egui::Image::new(texture).shrink_to_fit();
+                ui.add(image);
+            }
+
+            if let Some(format) = self.selected_img_format {
+                ui.label(format!("画像フォーマット: {format:?}"));
+            }
+
             // selcet image format
-            egui::ComboBox::from_label("に変換")
+            egui::ComboBox::from_label("変換形式")
                 .selected_text(match self.selected_format {
                     ConvertFormat::Jpeg => "jpeg",
                     ConvertFormat::Png => "png",
@@ -178,22 +230,35 @@ impl eframe::App for MyApp {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
                 });
 
-            // open folder
-            if ui.button("Dialog").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Image", &["jpg", "jpeg", "png", "webp"])
-                    .pick_file()
-                {
-                    self.texture = load_image(ui.ctx(), &path);
-                    self.selected_file = Some(path.clone());
-                    if let Ok(image) = image::open(&path) {
-                        self.selected_img = Some(image);
+            let convert_enabled = self.selected_img.is_some();
+
+            let convert_button = ui.add_enabled(convert_enabled, egui::Button::new("変換開始"));
+
+            if convert_button.clicked() {
+                if let Some(image) = &self.selected_img {
+                    let (extension, image_format) = match self.selected_format {
+                        ConvertFormat::Jpeg => ("jpg", ImageFormat::Jpeg),
+                        ConvertFormat::Png => ("png", ImageFormat::Png),
+                        ConvertFormat::WebP => ("webp", ImageFormat::WebP),
+                    };
+
+                    let default_name = format!("converted.{extension}");
+
+                    if let Some(output_path) = rfd::FileDialog::new()
+                        .add_filter("変換後の画像", &[extension])
+                        .set_file_name(&default_name)
+                        .save_file()
+                    {
+                        match image.save_with_format(&output_path, image_format) {
+                            Ok(()) => {
+                                println!("画像変換が完了: {}", output_path.display());
+                            }
+                            Err(error) => {
+                                eprint!("画像の変換に失敗しました: {error}");
+                            }
+                        }
                     }
                 }
-            }
-            if let Some(texture) = &self.texture {
-                let image = egui::Image::new(texture).shrink_to_fit();
-                ui.add(image);
             }
         });
     }
