@@ -270,42 +270,25 @@ impl eframe::App for MyApp {
                                                     "画像を変換し、メタデータを消去しました: {}",
                                                     output_path.display()
                                                 );
-
-                                                println!("{message}");
-                                                self.status_message = message;
+                                                    println!("{message}");
+                                                    self.status_message = message;
+                                                }Err(error) => {
+                                                    let message = format!("画像は変換しましたが、メタデータの消去に失敗しました: {error}");
+                                                    eprintln!("{message}");self.status_message = message;
+                                                }
                                             }
-                                            Err(error) => {
-                                                let message = format!(
-                                                    "画像は変換しましたが、メタデータの消去に失敗しました: {error}"
-                                                );
-
-                                                eprintln!("{message}");
-                                                self.status_message = message;
-                                            }
+                                        } else {
+                                            let message ="保存先のパスを文字列へ変換できませんでした".to_string();
+                                            eprintln!("{message}");self.status_message = message;
                                         }
                                     } else {
-                                        let message =
-                                            "保存先のパスを文字列へ変換できませんでした".to_string();
-
-                                        eprintln!("{message}");
-                                        self.status_message = message;
+                                        let message = format!("画像の変換が完了しました: {}",output_path.display());
+                                        println!("{message}");self.status_message = message;
                                     }
-                                } else {
-                                    let message = format!(
-                                        "画像の変換が完了しました: {}",
-                                        output_path.display()
-                                    );
-
-                                    println!("{message}");
-                                    self.status_message = message;
                                 }
-                            }
                             Err(error) => {
-                                let message =
-                                    format!("画像の変換に失敗しました: {error}");
-
-                                eprintln!("{message}");
-                                self.status_message = message;
+                                let message =format!("画像の変換に失敗しました: {error}");
+                                eprintln!("{message}");self.status_message = message;
                             }
                         }
                     }
