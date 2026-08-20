@@ -17,4 +17,8 @@
 画像のメタデータに含まれるGPSデータを削除する。
 （今後、変換フォーマットおよび機能を追加予定）
 
-## ライセンス
+## License/ライセンス
+
+This project is licensed under the GNU General Public License v3.0 or later.
+
+See the [LICENSE](LICENSE) file for details.
