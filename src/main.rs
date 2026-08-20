@@ -69,7 +69,7 @@ fn setup_fonts(ctx: &egui::Context) {
         .families
         .get_mut(&egui::FontFamily::Proportional)
         .unwrap()
-        .insert(0, "japanese".to_owned());
+        .push("japanese".to_owned());
 
     ctx.set_fonts(fonts);
 }
