@@ -8,15 +8,14 @@ const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions::default();
 
-    let _ = eframe::run_native(
+    eframe::run_native(
         "Image Conversion",
         options,
         Box::new(|cc| {
             setup_fonts(&cc.egui_ctx);
             Ok(Box::new(MyApp::default()))
         }),
-    );
-    Ok(())
+    )
 }
 
 // remove photo metadata
@@ -94,6 +93,24 @@ enum ConvertFormat {
     WebP,
 }
 
+impl ConvertFormat {
+    fn extension(self) -> &'static str {
+        match self {
+            Self::Jpeg => "jpg",
+            Self::Png => "png",
+            Self::WebP => "webp",
+        }
+    }
+
+    fn image_format(self) -> ImageFormat {
+        match self {
+            Self::Jpeg => ImageFormat::Jpeg,
+            Self::Png => ImageFormat::Png,
+            Self::WebP => ImageFormat::WebP,
+        }
+    }
+}
+
 impl MyApp {
     fn open_image(&mut self, ctx: &egui::Context) {
         let Some(path) = rfd::FileDialog::new()
@@ -158,21 +175,14 @@ impl eframe::App for MyApp {
 
             // selcet image format
             egui::ComboBox::from_label("変換形式")
-                .selected_text(match self.selected_format {
-                    ConvertFormat::Jpeg => "jpeg",
-                    ConvertFormat::Png => "png",
-                    ConvertFormat::WebP => "webp",
-                })
+                .selected_text(self.selected_format.extension())
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Jpeg, "jpg");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Png, "png");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
                 });
 
-            ui.checkbox(
-                &mut self.remove_metadata_enabled,
-                "変換後にメタデータを消去する",
-            );
+            ui.checkbox(&mut self.remove_metadata_enabled,"変換後にGPS関連のメタデータを消去する",);
 
             let convert_enabled = self.selected_img.is_some();
 
@@ -180,11 +190,8 @@ impl eframe::App for MyApp {
 
             if convert_button.clicked()
                 && let Some(image) = &self.selected_img {
-                    let (extension, image_format) = match self.selected_format {
-                        ConvertFormat::Jpeg => ("jpg", ImageFormat::Jpeg),
-                        ConvertFormat::Png => ("png", ImageFormat::Png),
-                        ConvertFormat::WebP => ("webp", ImageFormat::WebP),
-                    };
+                    let extension = self.selected_format.extension();
+                    let image_format = self.selected_format.image_format();
 
                     let default_name = format!("converted.{extension}");
 
