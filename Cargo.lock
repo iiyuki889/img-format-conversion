@@ -3,6 +3,16 @@
 version = 4
 
 [[package]]
+name = "Image-converter-tool"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "exiftool-rs",
+ "image",
+ "rfd",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1781,16 +1791,6 @@ checksum = "525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3"
 dependencies = [
  "byteorder-lite",
  "quick-error",
-]
-
-[[package]]
-name = "img-conversion"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "exiftool-rs",
- "image",
- "rfd",
 ]
 
 [[package]]

@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 use eframe::egui;
 use exiftool_rs::ExifTool;
 use image::ImageFormat;
