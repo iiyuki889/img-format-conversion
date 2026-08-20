@@ -4,6 +4,7 @@ use image::ImageFormat;
 use std::path::PathBuf;
 use std::result::Result::Ok;
 
+const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions::default();
 
@@ -93,56 +94,59 @@ enum ConvertFormat {
     WebP,
 }
 
+impl MyApp {
+    fn open_image(&mut self, ctx: &egui::Context) {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("Image", IMAGE_EXTENSIONS)
+            .pick_file()
+        else {
+            return;
+        };
+
+        let reader = match image::ImageReader::open(&path) {
+            Ok(reader) => reader,
+            Err(error) => {
+                self.status_message = format!("ファイルを開けませんでした: {error}");
+                return;
+            }
+        };
+
+        let reader = match reader.with_guessed_format() {
+            Ok(reader) => reader,
+            Err(error) => {
+                self.status_message = format!("画像を判定できませんでした。: {error}");
+                return;
+            }
+        };
+
+        let image_format = reader.format();
+
+        match reader.decode() {
+            Ok(image) => {
+                self.texture = Some(load_texture(ctx, &image));
+                self.selected_file = Some(path.clone());
+                self.selected_img = Some(image);
+                self.selected_img_format = image_format;
+                self.status_message = format!("画像を開きました: {}", path.display());
+            }
+            Err(error) => {
+                self.texture = None;
+                self.selected_file = None;
+                self.selected_img = None;
+                self.selected_img_format = None;
+                self.status_message = format!("画像を読み込めませんでした: {error}");
+            }
+        }
+    }
+}
+
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ui, |ui| {
             ui.heading("Image converter tool");
 
-            // open folder
-            if ui.button("Open faile").clicked()
-                && let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Image", &["jpg", "jpeg", "png", "webp"])
-                    .pick_file()
-                {
-                    let reader = match image::ImageReader::open(&path) {
-                        Ok(reader) => reader,
-                        Err(error) => {
-                            eprintln!("ファイルを開けません: {error}");
-                            return;
-                        }
-                    };
+            if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
 
-                    let reader = match reader.with_guessed_format() {
-                        Ok(reader) => reader,
-                        Err(error) => {
-                            eprint!("画像形式を判定できません: {error}");
-                            return;
-                        }
-                    };
-
-                    if let Some(format) = reader.format() {
-                        println!("画像フォーマット: {format:?}");
-                    } else {
-                        println!("画像フォーマットを判定できません");
-                    }
-
-                    match image::open(&path) {
-                        Ok(image) => {
-                            //画像の表示
-                            self.texture = Some(load_texture(ui.ctx(), &image));
-                            self.selected_file = Some(path.clone());
-                            self.selected_img = Some(image);
-                            // 画像フォーマットの文字列の保存
-                            self.selected_img_format = reader.format();
-                            self.status_message = format!("画像を開きました: {}", path.display());
-                        }
-                        Err(error) => {
-                            self.texture = None;
-                            self.selected_img = None;
-                            self.status_message = format!("画像を開けませんでした: {error}");
-                        }
-                    }
-                }
             if let Some(texture) = &self.texture {
                 let image = egui::Image::new(texture).shrink_to_fit();
                 ui.add(image);
