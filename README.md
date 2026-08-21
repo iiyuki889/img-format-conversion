@@ -22,3 +22,8 @@
 This project is licensed under the GNU General Public License v3.0 or later.
 
 See the [LICENSE](LICENSE) file for details.
+
+## Fonts
+
+The bundled font is licensed under the SIL Open Font License 1.1.
+See `licenses/OFL-1.1.txt` for details.
