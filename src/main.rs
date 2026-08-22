@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use eframe::egui;
 use exiftool_rs::ExifTool;
 use image::ImageFormat;
@@ -7,10 +7,13 @@ use std::result::Result::Ok;
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "ico"];
 fn main() -> eframe::Result {
-    let options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        viewport: eframe::egui::ViewportBuilder::default().with_icon(load_icon()),
+        ..Default::default()
+    };
 
     eframe::run_native(
-        "Image Conversion",
+        "Image format conversion",
         options,
         Box::new(|cc| {
             setup_fonts(&cc.egui_ctx);
@@ -19,6 +22,20 @@ fn main() -> eframe::Result {
     )
 }
 
+fn load_icon() -> eframe::egui::IconData {
+    let image = image::load_from_memory(include_bytes!("../assets/icon.jpg"))
+        .expect("Failed to load icon")
+        .into_rgba8();
+
+    let width = image.width();
+    let height = image.height();
+
+    eframe::egui::IconData {
+        rgba: image.into_raw(),
+        height,
+        width,
+    }
+}
 // remove photo metadata
 fn remove_tags(input_img: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut exiftool = ExifTool::new();
@@ -210,7 +227,14 @@ impl eframe::App for MyApp {
                         .set_file_name(&default_name)
                         .save_file()
                     {
-                        match image.save_with_format(&output_path, image_format) {
+                        let save_result = if self.selected_format == ConvertFormat::Ico{
+                        let resized_image_ico = image.thumbnail(256,256).to_rgba8();
+                        resized_image_ico.save_with_format(&output_path,image_format)
+                    } else {
+                        image.save_with_format(&output_path, image_format)
+                    };
+
+                        match save_result {
                             Ok(()) => {
                                 if self.remove_metadata_enabled {
                                     if let Some(output_path_str) = output_path.to_str() {
