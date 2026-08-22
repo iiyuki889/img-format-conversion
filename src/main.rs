@@ -5,7 +5,7 @@ use image::ImageFormat;
 use std::path::PathBuf;
 use std::result::Result::Ok;
 
-const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp"];
+const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "ico"];
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions::default();
 
@@ -92,6 +92,8 @@ enum ConvertFormat {
     Jpeg,
     Png,
     WebP,
+    Gif,
+    Ico,
 }
 
 impl ConvertFormat {
@@ -100,6 +102,8 @@ impl ConvertFormat {
             Self::Jpeg => "jpg",
             Self::Png => "png",
             Self::WebP => "webp",
+            Self::Gif => "gif",
+            Self::Ico => "ico",
         }
     }
 
@@ -108,6 +112,8 @@ impl ConvertFormat {
             Self::Jpeg => ImageFormat::Jpeg,
             Self::Png => ImageFormat::Png,
             Self::WebP => ImageFormat::WebP,
+            Self::Gif => ImageFormat::Gif,
+            Self::Ico => ImageFormat::Ico,
         }
     }
 }
@@ -161,6 +167,7 @@ impl MyApp {
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ui, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui|{
             ui.heading("Image converter tool");
 
             if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
@@ -181,6 +188,8 @@ impl eframe::App for MyApp {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Jpeg, "jpg");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Png, "png");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
+                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Gif, "gif");
+                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Ico, "ico");
                 });
 
             ui.checkbox(&mut self.remove_metadata_enabled,"変換後にGPS関連のメタデータを消去する",);
@@ -240,5 +249,6 @@ impl eframe::App for MyApp {
                 ui.label(&self.status_message);
             }
         });
+    });
     }
 }
