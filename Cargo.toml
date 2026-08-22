@@ -1,6 +1,6 @@
 [package]
 name = "Image-converter-tool"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
@@ -8,3 +8,7 @@ eframe = "0.36.1"
 exiftool-rs = "0.7.4"
 image = "0.25.10"
 rfd = "0.17.2"
+winresource = "0.1.31"
+
+[build-dependencies]
+winresource = "0.1"
