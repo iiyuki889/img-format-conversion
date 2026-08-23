@@ -2,7 +2,6 @@
 
 撮った写真をほかのフォーマットに変換する。元データの撮影情報を可能な限り保持しながら、公開時に危険となるEXIFメタデータを除去する。元画像は上書きせず、JPEG画像データの再圧縮も行いません
 
-
 ## 動作環境
 
 * Windows
@@ -28,3 +27,7 @@ See the [LICENSE](LICENSE) file for details.
 
 The bundled font is licensed under the SIL Open Font License 1.1.
 See `licenses/OFL-1.1.txt` for details.
+
+## ToDo
+
+* 画像変換を別スレットに移行
