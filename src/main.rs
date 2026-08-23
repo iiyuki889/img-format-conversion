@@ -101,6 +101,7 @@ struct MyApp {
     selected_img_format: Option<ImageFormat>,
     remove_metadata_enabled: bool,
     status_message: String,
+    //image_texture: Option<egui::TextureHandle>,
 }
 
 #[derive(Default, PartialEq, Clone, Copy)]
@@ -187,12 +188,49 @@ impl eframe::App for MyApp {
             egui::ScrollArea::vertical().show(ui, |ui|{
             ui.heading("Image format converter tool");
 
-            if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
+            // 画像のプレビュー領域
+            ui.group(|ui| {
+                ui.add_space(10.0);
 
-            if let Some(texture) = &self.texture {
-                let image = egui::Image::new(texture).shrink_to_fit();
-                ui.add(image);
-            }
+                let preview_width = (ui.available_width() -20.0).clamp(100.0, 500.0);
+                let preview_height = (preview_width * 0.75).clamp(100.0, 500.0);
+                let preview_size = egui::vec2(preview_width, preview_height);
+                let (rect, _response) = ui.allocate_exact_size(preview_size, egui::Sense::hover());
+                ui.painter().rect_filled(
+                    rect,
+                    8.0,
+                    egui::Color32::from_gray(30),
+                );
+                if let Some(texture)= &self.texture{
+                    let original_size = texture.size_vec2();
+                    let width_scale = rect.width() / original_size.x;
+                    let height_scale = rect.height() / original_size.y;
+                    let scale = width_scale.min(height_scale).min(1.0);
+                    let display_size = original_size * scale;
+                    let  image_rect = egui::Rect::from_center_size(rect.center(), display_size,);
+
+                ui.painter().image(
+                    texture.id(),
+                    image_rect,
+                    egui::Rect::from_min_max(
+                        egui::pos2(0.0, 0.0),
+                        egui::pos2(1.0,1.0),
+                        ), 
+                        egui::Color32::WHITE,);
+                }else {
+                    ui.painter().text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "画像をドロップしてください",
+                    egui::FontId::proportional(18.0),
+                    egui::Color32::GRAY,
+            );
+                }
+                
+        });
+            
+            // 画像を開く
+            if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
 
             if let Some(format) = self.selected_img_format {
                 ui.label(format!("画像フォーマット: {format:?}"));
