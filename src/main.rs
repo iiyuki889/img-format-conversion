@@ -23,7 +23,7 @@ fn main() -> eframe::Result {
 }
 
 fn load_icon() -> eframe::egui::IconData {
-    let image = image::load_from_memory(include_bytes!("../assets/icon.jpg"))
+    let image = image::load_from_memory(include_bytes!("../assets/app_icon.png"))
         .expect("Failed to load icon")
         .into_rgba8();
 
@@ -185,7 +185,7 @@ impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui|{
-            ui.heading("Image converter tool");
+            ui.heading("Image format converter tool");
 
             if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
 
