@@ -101,7 +101,7 @@ struct MyApp {
     selected_img_format: Option<ImageFormat>,
     remove_metadata_enabled: bool,
     status_message: String,
-    //image_texture: Option<egui::TextureHandle>,
+    status_kind: StatusKind,
 }
 
 #[derive(Default, PartialEq, Clone, Copy)]
@@ -112,6 +112,16 @@ enum ConvertFormat {
     WebP,
     Gif,
     Ico,
+}
+
+#[derive(Default, PartialEq)]
+enum StatusKind {
+    #[default]
+    Idle,
+    Info,
+    Processing,
+    Success,
+    Error,
 }
 
 impl ConvertFormat {
@@ -151,6 +161,7 @@ impl MyApp {
         let reader = match image::ImageReader::open(&path) {
             Ok(reader) => reader,
             Err(error) => {
+                self.status_kind = StatusKind::Error;
                 self.status_message = format!("ファイルを開けませんでした: {error}");
                 return;
             }
@@ -172,6 +183,7 @@ impl MyApp {
                 self.selected_file = Some(path.clone());
                 self.selected_img = Some(image);
                 self.selected_img_format = image_format;
+                self.status_kind = StatusKind::Info;
                 self.status_message = format!("画像を開きました: {}", path.display());
             }
             Err(error) => {
@@ -289,6 +301,8 @@ impl eframe::App for MyApp {
 
             if convert_button.clicked()
                 && let Some(image) = &self.selected_img {
+                    self.status_kind = StatusKind::Processing;
+                    self.status_message = "画像を変換中".to_string();
                     let extension = self.selected_format.extension();
                     let image_format = self.selected_format.image_format();
 
@@ -320,21 +334,26 @@ impl eframe::App for MyApp {
                                                     self.status_message = message;
                                                 }Err(error) => {
                                                     let message = format!("画像は変換しましたが、メタデータの消去に失敗しました: {error}");
-                                                    eprintln!("{message}");self.status_message = message;
+                                                    self.status_kind = StatusKind::Error;
+                                                    self.status_message = message;
                                                 }
                                             }
                                         } else {
                                             let message ="保存先のパスを文字列へ変換できませんでした".to_string();
-                                            eprintln!("{message}");self.status_message = message;
+                                            self.status_kind = StatusKind::Error;
+                                            self.status_message = message;
                                         }
                                     } else {
                                         let message = format!("画像の変換が完了しました: {}",output_path.display());
-                                        println!("{message}");self.status_message = message;
+                                        self.status_kind = StatusKind::Success;
+                                        self.status_message = message;
                                     }
                                 }
                             Err(error) => {
                                 let message =format!("画像の変換に失敗しました: {error}");
-                                eprintln!("{message}");self.status_message = message;
+                                self.status_kind = StatusKind::Error;
+                                self.status_message = message;
+                                
                             }
                         }
                     }
@@ -342,7 +361,28 @@ impl eframe::App for MyApp {
 
             if !self.status_message.is_empty() {
                 ui.separator();
-                ui.label(&self.status_message);
+                ui.horizontal(|ui| {
+                match self.status_kind {
+                    StatusKind::Idle => {}
+
+                    StatusKind::Info => {
+                    ui.colored_label(egui::Color32::LIGHT_BLUE, &self.status_message,);
+                }
+
+                StatusKind::Processing => {
+                    ui.add(egui::Spinner::new());
+                    ui.label(&self.status_message);
+                }
+
+                StatusKind::Success => {
+                    ui.colored_label(egui::Color32::LIGHT_GREEN, &self.status_message,);
+                }
+
+                StatusKind::Error => {ui.colored_label(egui::Color32::LIGHT_RED, &self.status_message,);
+                }
+
+
+                }});
             }
         });
     });
