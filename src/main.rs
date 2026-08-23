@@ -240,9 +240,35 @@ impl eframe::App for MyApp {
             // 画像を開く
             if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
 
-            if let Some(format) = self.selected_img_format {
-                ui.label(format!("画像フォーマット: {format:?}"));
+            //if let Some(format) = self.selected_img_format {ui.label(format!("画像フォーマット: {format:?}"));}
+
+            ui.group(|ui| {
+            ui.heading("入力情報");
+            ui.add_space(8.0);
+
+            if let (Some(path), Some(image)) = (&self.selected_file, &self.selected_img) {
+                let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("不明");
+                ui.label(format!("ファイル名: {file_name}"));
+                ui.label(format!(
+                "画像サイズ: {} * {} px",image.width(),image.height()));
+
+                if let Some(format) = self.selected_img_format {
+                    ui.label(format!("画像形式: {format:?}"));
+                    
+                }
+
+                match std::fs::metadata(path) {
+                    Ok(metadata) => {
+                    let file_size_kb = metadata.len() as f64 /1024.0;
+                    ui.label(format!("ファイル容量: {file_size_kb:.1} kB"));
+                }
+                Err(_) => {
+                ui.label("画像が選択されていません");}
+                }
+
             }
+        });
+
 
             // selcet image format
             egui::ComboBox::from_label("変換形式")
