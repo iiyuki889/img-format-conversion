@@ -144,7 +144,10 @@ impl MyApp {
         else {
             return;
         };
+        self.load_image_from_path(ctx, path);
+    }
 
+    fn load_image_from_path(&mut self, ctx: &egui::Context, path: PathBuf) {
         let reader = match image::ImageReader::open(&path) {
             Ok(reader) => reader,
             Err(error) => {
@@ -186,6 +189,11 @@ impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui|{
+                // ドロップファイルの取得
+                let dropped_path = ui.ctx().input(|input| {input.raw.dropped_files.first().map(|file| file.path().to_path_buf())});
+                if let Some(path) = dropped_path{
+                self.load_image_from_path(ui.ctx(), path);
+            }
             ui.heading("Image format converter tool");
 
             // 画像のプレビュー領域
