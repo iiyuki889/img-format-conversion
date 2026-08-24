@@ -52,34 +52,25 @@ pub fn save_image(
     }
 }
 
-pub fn remove_tags(input_img: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn copy_metadata(
+    input_path: &Path,
+    output_path: &Path,
+    remove_gps: bool,
+) -> Result<u32, Box<dyn std::error::Error>> {
     let mut exiftool = ExifTool::new();
-
-    let tags = match exiftool.extract_info(input_img) {
-        Ok(tags) => tags,
-        Err(error) => {
-            eprintln!("メタデータの取得に失敗しました: {error}");
-            return Ok(());
-        }
-    };
-
-    for tag in &tags {
-        if tag.name.starts_with("GPS") {
-            println!("削除対象: {}", tag.name);
-            exiftool.set_new_value(&tag.name, None);
+    let copied_count = exiftool.set_new_values_from_file(input_path, None)?;
+    if remove_gps {
+        let input_tags = exiftool.extract_info(input_path)?;
+        for tag in input_tags {
+            if tag.name.starts_with("GPS") {
+                let tag_name = format!("GPS:{}", tag.name);
+                exiftool.set_new_value(&tag_name, None);
+            }
         }
     }
 
-    match exiftool.write_info(input_img, input_img) {
-        Ok(_) => {
-            println!("GPS関連のタグを削除しました");
-        }
-        Err(error) => {
-            eprintln!("メタデータの書き込みに失敗しました: {error}");
-        }
-    }
-
-    Ok(())
+    exiftool.write_info(output_path, output_path)?;
+    Ok(copied_count)
 }
 
 pub fn save_ico(image: &DynamicImage, output_path: &Path) -> image::ImageResult<()> {
