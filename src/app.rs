@@ -113,182 +113,141 @@ impl eframe::App for MyApp {
                 // ドロップファイルの取得
                 let dropped_path = ui.ctx().input(|input| {input.raw.dropped_files.first().map(|file| file.path().to_path_buf())});
                 if let Some(path) = dropped_path{
-                self.load_image_from_path(ui.ctx(), path);
-            }
-            ui.heading("Image format converter tool");
-
-            // 画像のプレビュー領域
-            ui.group(|ui| {
-                ui.add_space(10.0);
-
-                let preview_width = (ui.available_width() -20.0).clamp(100.0, 500.0);
-                let preview_height = (preview_width * 0.75).clamp(100.0, 500.0);
-                let preview_size = egui::vec2(preview_width, preview_height);
-                let (rect, _response) = ui.allocate_exact_size(preview_size, egui::Sense::hover());
-                ui.painter().rect_filled(
-                    rect,
-                    8.0,
-                    egui::Color32::from_gray(30),
-                );
-                if let Some(texture)= &self.texture{
-                    let original_size = texture.size_vec2();
-                    let width_scale = rect.width() / original_size.x;
-                    let height_scale = rect.height() / original_size.y;
-                    let scale = width_scale.min(height_scale).min(1.0);
-                    let display_size = original_size * scale;
-                    let  image_rect = egui::Rect::from_center_size(rect.center(), display_size,);
-
-                ui.painter().image(
-                    texture.id(),
-                    image_rect,
-                    egui::Rect::from_min_max(
-                        egui::pos2(0.0, 0.0),
-                        egui::pos2(1.0,1.0),
-                        ), 
-                        egui::Color32::WHITE,);
-                }else {
-                    ui.painter().text(
-                    rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    "画像をドロップしてください",
-                    egui::FontId::proportional(18.0),
-                    egui::Color32::GRAY,
-            );
+                    self.load_image_from_path(ui.ctx(), path);
                 }
-                
-        });
-            
-            // 画像を開く
-            if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
-
-            //if let Some(format) = self.selected_img_format {ui.label(format!("画像フォーマット: {format:?}"));}
-
-            ui.group(|ui| {
-            ui.heading("入力情報");
-            ui.add_space(8.0);
-
-            if let (Some(path), Some(image)) = (&self.selected_file, &self.selected_img) {
-                let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("不明");
-                ui.label(format!("ファイル名: {file_name}"));
-                ui.label(format!(
-                "画像サイズ: {} * {} px",image.width(),image.height()));
-
-                if let Some(format) = self.selected_img_format {
-                    ui.label(format!("画像形式: {format:?}"));
-                    
-                }
-
-                match std::fs::metadata(path) {
-                    Ok(metadata) => {
-                    let file_size_kb = metadata.len() as f64 /1024.0;
-                    ui.label(format!("ファイル容量: {file_size_kb:.1} kB"));
-                }
-                Err(_) => {
-                ui.label("画像が選択されていません");}
-                }
-
-            }
-        });
-
-
-            // selcet image format
-            egui::ComboBox::from_label("変換形式")
+                // title
+                ui.heading("Image format converter tool");
+                ui.add_space(12.0);
+                let available_width = ui.available_width();
+                let preview_width = (available_width * 0.62).clamp(300.0, 500.0);
+                let info_width = (available_width - preview_width -32.0).max(220.0);
+                // 画像のプレビュー領域
+                ui.horizontal_top(|ui|{
+                    ui.vertical(|ui|{
+                        ui.group(|ui| {
+                            ui.add_space(10.0);
+                            let preview_width = (ui.available_width() -20.0).clamp(100.0, 500.0);
+                            let preview_height = (preview_width * 0.75).clamp(100.0, 500.0);
+                            let preview_size = egui::vec2(preview_width, preview_height);
+                            let (rect, _response) = ui.allocate_exact_size(preview_size, egui::Sense::hover());
+                            ui.painter().rect_filled(rect,8.0,egui::Color32::from_gray(30),);
+                            if let Some(texture)= &self.texture{
+                                let original_size = texture.size_vec2();
+                                let width_scale = rect.width() / original_size.x;
+                                let height_scale = rect.height() / original_size.y;
+                                let scale = width_scale.min(height_scale).min(1.0);
+                                let display_size = original_size * scale;
+                                let  image_rect = egui::Rect::from_center_size(rect.center(), display_size,);
+                                ui.painter().image(texture.id(),image_rect,egui::Rect::from_min_max(egui::pos2(0.0, 0.0),egui::pos2(1.0,1.0),),egui::Color32::WHITE,);
+                            }else {
+                                ui.painter().text(rect.center(),egui::Align2::CENTER_CENTER,"画像をドロップしてください",egui::FontId::proportional(18.0),egui::Color32::GRAY,);
+                                }
+                        });
+                        // 入力情報スペース
+                        ui.group(|ui| {
+                            ui.heading("入力情報");
+                            ui.add_space(8.0);
+                            if let (Some(path),Some(image)) = (&self.selected_file, &self.selected_img) {
+                                let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("不明");
+                                ui.label(format!("ファイル名: {file_name}"));
+                                ui.label(format!("画像サイズ: {} * {} px",image.width(),image.height()));
+                                if let Some(format) = self.selected_img_format {
+                                    ui.label(format!("画像形式: {format:?}"));
+                                }
+                                match std::fs::metadata(path) {Ok(metadata) => {
+                                    let file_size_kb = metadata.len() as f64 /1024.0;
+                                    ui.label(format!("ファイル容量: {file_size_kb:.1} kB"));
+                                }Err(_) => {
+                                    ui.label("画像が選択されていません");
+                                }}
+                            }
+                        });
+                    })
+                });
+                // 画像を開く
+                if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
+                // selcet image format
+                egui::ComboBox::from_label("変換形式")
                 .selected_text(self.selected_format.extension())
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Jpeg, "jpg");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Png, "png");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Gif, "gif");
-                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Ico, "ico");
-                });
+                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Ico, "ico");});
+                    ui.checkbox(&mut self.remove_metadata_enabled,"変換後にGPS関連のメタデータを消去する",
+                );
 
-            ui.checkbox(&mut self.remove_metadata_enabled,"変換後にGPS関連のメタデータを消去する",);
+                let convert_enabled = self.selected_img.is_some();
+                let convert_button = ui.add_enabled(convert_enabled, egui::Button::new("変換開始"));
+                if convert_button.clicked()
 
-            let convert_enabled = self.selected_img.is_some();
-
-            let convert_button = ui.add_enabled(convert_enabled, egui::Button::new("変換開始"));
-
-            if convert_button.clicked()
                 && let Some(image) = &self.selected_img {
                     self.status_kind = StatusKind::Processing;
                     self.status_message = "画像を変換中".to_string();
                     let extension = self.selected_format.extension();
-                    
-
                     let default_name = format!("converted.{extension}");
 
                     if let Some(output_path) = rfd::FileDialog::new()
-                        .add_filter("変換後の画像", &[extension])
-                        .set_file_name(&default_name)
-                        .save_file()
+                    .add_filter("変換後の画像", &[extension])
+                    .set_file_name(&default_name)
+                    .save_file()
                     {
                         let save_result = save_image(image, &output_path, self.selected_format,);
-
                         match save_result {
                             Ok(()) => {
                                 if self.remove_metadata_enabled {
                                     if let Some(output_path_str) = output_path.to_str() {
                                         match remove_tags(output_path_str) {
                                             Ok(()) => {
-                                                let message = format!(
-                                                    "画像を変換し、メタデータを消去しました: {}",
-                                                    output_path.display()
-                                                );
-                                                    println!("{message}");
-                                                    self.status_message = message;
-                                                }Err(error) => {
-                                                    let message = format!("画像は変換しましたが、メタデータの消去に失敗しました: {error}");
-                                                    self.status_kind = StatusKind::Error;
-                                                    self.status_message = message;
-                                                }
+                                                let message = format!("画像を変換し、メタデータを消去しました: {}",output_path.display());
+                                                self.status_message = message;
+                                            }Err(error) => {
+                                                let message = format!("画像は変換しましたが、メタデータの消去に失敗しました: {error}");
+                                                self.status_kind = StatusKind::Error;
+                                                self.status_message = message;
                                             }
-                                        } else {
-                                            let message ="保存先のパスを文字列へ変換できませんでした".to_string();
-                                            self.status_kind = StatusKind::Error;
-                                            self.status_message = message;
                                         }
                                     } else {
-                                        let message = format!("画像の変換が完了しました: {}",output_path.display());
-                                        self.status_kind = StatusKind::Success;
+                                        let message ="保存先のパスを文字列へ変換できませんでした".to_string();
+                                        self.status_kind = StatusKind::Error;
                                         self.status_message = message;
                                     }
+                                } else {
+                                    let message = format!("画像の変換が完了しました: {}",output_path.display());
+                                    self.status_kind = StatusKind::Success;
+                                    self.status_message = message;
                                 }
+                            }
                             Err(error) => {
                                 let message =format!("画像の変換に失敗しました: {error}");
                                 self.status_kind = StatusKind::Error;
                                 self.status_message = message;
-                                
                             }
                         }
                     }
                 }
-
-            if !self.status_message.is_empty() {
-                ui.separator();
-                ui.horizontal(|ui| {
-                match self.status_kind {
-                    StatusKind::Idle => {}
-
-                    StatusKind::Info => {
-                    ui.colored_label(egui::Color32::LIGHT_BLUE, &self.status_message,);
+                if !self.status_message.is_empty() {
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        match self.status_kind {
+                            StatusKind::Idle => {}
+                            StatusKind::Info => {
+                                ui.colored_label(egui::Color32::LIGHT_BLUE, &self.status_message,);
+                            }
+                            StatusKind::Processing => {
+                                ui.add(egui::Spinner::new());
+                                ui.label(&self.status_message);
+                            }
+                            StatusKind::Success => {
+                                ui.colored_label(egui::Color32::LIGHT_GREEN, &self.status_message,);
+                            }
+                            StatusKind::Error => {ui.colored_label(egui::Color32::LIGHT_RED, &self.status_message,);
+                            }
+                        }
+                    });
                 }
-
-                StatusKind::Processing => {
-                    ui.add(egui::Spinner::new());
-                    ui.label(&self.status_message);
-                }
-
-                StatusKind::Success => {
-                    ui.colored_label(egui::Color32::LIGHT_GREEN, &self.status_message,);
-                }
-
-                StatusKind::Error => {ui.colored_label(egui::Color32::LIGHT_RED, &self.status_message,);
-                }
-
-
-                }});
-            }
+            });
         });
-    });
     }
 }
