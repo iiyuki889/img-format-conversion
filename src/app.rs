@@ -1,4 +1,4 @@
-use crate::converter::{ConvertFormat, IMAGE_EXTENSIONS, read_metadata, remove_tags, save_image};
+use crate::converter::{ConvertFormat, IMAGE_EXTENSIONS, copy_metadata, read_metadata, save_image};
 use eframe::egui;
 use image::ImageFormat;
 use std::path::PathBuf;
@@ -244,7 +244,7 @@ impl eframe::App for MyApp {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Gif, "gif");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Ico, "ico");});
-                    ui.checkbox(&mut self.remove_metadata_enabled,"変換後にGPS関連のメタデータを消去する",
+                    ui.checkbox(&mut self.remove_metadata_enabled,"変換後にGPS関連のメタデータを引き継がない",
                 );
 
                 let convert_enabled = self.selected_img.is_some();
@@ -266,34 +266,40 @@ impl eframe::App for MyApp {
                         let save_result = save_image(image, &output_path, self.selected_format,);
                         match save_result {
                             Ok(()) => {
-                                if self.remove_metadata_enabled {
-                                    if let Some(output_path_str) = output_path.to_str() {
-                                        match remove_tags(output_path_str) {
-                                            Ok(()) => {
-                                                let message = format!("画像を変換し、メタデータを消去しました: {}",output_path.display());
-                                                self.status_kind = StatusKind::Success;
-                                                self.status_message = message;
-                                            }Err(error) => {
-                                                let message = format!("画像は変換しましたが、メタデータの消去に失敗しました: {error}");
-                                                self.status_kind = StatusKind::Error;
-                                                self.status_message = message;
-                                            }
+                                let Some(input_path) = self.selected_file.as_deref() else {
+                                    self.status_kind = StatusKind::Error;
+                                    self.status_message = "変換元のパスを取得できませんでした".to_string();
+                                    return;
+                                };
+
+                                match copy_metadata(input_path, &output_path, self.remove_metadata_enabled) {
+                                    Ok(copied_count) => {
+                                        self.status_kind = StatusKind::Success;
+
+                                        if self.remove_metadata_enabled{
+                                            self.status_message = format!(
+                                                "画像を変換し、メタデータを引き継ぎました(GPSを除外 {}タグ。: {}",
+                                                copied_count,
+                                                output_path.display()
+                                            );
+                                        }else {
+                                            self.status_message = format!(
+                                                "画像を変換し、メタデータを引き継ぎました({}タグ): {}",
+                                                copied_count,
+                                                output_path.display()
+                                            );
                                         }
-                                    } else {
-                                        let message ="保存先のパスを文字列へ変換できませんでした".to_string();
-                                        self.status_kind = StatusKind::Error;
-                                        self.status_message = message;
                                     }
-                                } else {
-                                    let message = format!("画像の変換が完了しました: {}",output_path.display());
-                                    self.status_kind = StatusKind::Success;
-                                    self.status_message = message;
+                                    Err(error) => {
+                                        self.status_kind = StatusKind::Error;
+                                        self.status_message = format!("画像は保存しましたが、メタデータの引継ぎに失敗しました。: {error}");
+                                    }
                                 }
                             }
                             Err(error) => {
-                                let message =format!("画像の変換に失敗しました: {error}");
                                 self.status_kind = StatusKind::Error;
-                                self.status_message = message;
+                                self.status_message =
+                                    format!("画像の変換に失敗しました: {error}");
                             }
                         }
                     }
