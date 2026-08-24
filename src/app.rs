@@ -1,4 +1,4 @@
-use crate::converter::{ConvertFormat, IMAGE_EXTENSIONS, remove_tags, save_image};
+use crate::converter::{ConvertFormat, IMAGE_EXTENSIONS, read_metadata, remove_tags, save_image};
 use eframe::egui;
 use image::ImageFormat;
 use std::path::PathBuf;
@@ -43,6 +43,7 @@ pub struct MyApp {
     remove_metadata_enabled: bool,
     status_message: String,
     status_kind: StatusKind,
+    metadata: Vec<(String, String)>,
 }
 
 #[derive(Default, PartialEq)]
@@ -88,6 +89,7 @@ impl MyApp {
 
         match reader.decode() {
             Ok(image) => {
+                self.metadata = read_metadata(&path).unwrap_or_default();
                 self.texture = Some(load_texture(ctx, &image));
                 self.selected_file = Some(path.clone());
                 self.selected_img = Some(image);
@@ -100,6 +102,7 @@ impl MyApp {
                 self.selected_file = None;
                 self.selected_img = None;
                 self.selected_img_format = None;
+                self.metadata.clear();
                 self.status_message = format!("画像を読み込めませんでした: {error}");
             }
         }
@@ -120,15 +123,15 @@ impl eframe::App for MyApp {
                 ui.add_space(12.0);
                 let available_width = ui.available_width();
                 let preview_width = (available_width * 0.62).clamp(300.0, 500.0);
-                let info_width = (available_width - preview_width -32.0).max(220.0);
+                let preview_height = (preview_width * 0.75).clamp(100.0, 500.0);
+                let preview_size = egui::vec2(preview_width, preview_height);
+
                 // 画像のプレビュー領域
                 ui.horizontal_top(|ui|{
                     ui.vertical(|ui|{
                         ui.group(|ui| {
                             ui.add_space(10.0);
-                            let preview_width = (ui.available_width() -20.0).clamp(100.0, 500.0);
-                            let preview_height = (preview_width * 0.75).clamp(100.0, 500.0);
-                            let preview_size = egui::vec2(preview_width, preview_height);
+
                             let (rect, _response) = ui.allocate_exact_size(preview_size, egui::Sense::hover());
                             ui.painter().rect_filled(rect,8.0,egui::Color32::from_gray(30),);
                             if let Some(texture)= &self.texture{
@@ -137,35 +140,82 @@ impl eframe::App for MyApp {
                                 let height_scale = rect.height() / original_size.y;
                                 let scale = width_scale.min(height_scale).min(1.0);
                                 let display_size = original_size * scale;
-                                let  image_rect = egui::Rect::from_center_size(rect.center(), display_size,);
+                                let image_rect = egui::Rect::from_center_size(rect.center(), display_size,);
                                 ui.painter().image(texture.id(),image_rect,egui::Rect::from_min_max(egui::pos2(0.0, 0.0),egui::pos2(1.0,1.0),),egui::Color32::WHITE,);
                             }else {
                                 ui.painter().text(rect.center(),egui::Align2::CENTER_CENTER,"画像をドロップしてください",egui::FontId::proportional(18.0),egui::Color32::GRAY,);
                                 }
+
+                            // 画像を開く
+                            if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
                         });
+                    });
+
+                        ui.add_space(16.0);
+                        let info_width = (ui.available_width() - 16.0).max(120.0);
+
                         // 入力情報スペース
-                        ui.group(|ui| {
-                            ui.heading("入力情報");
-                            ui.add_space(8.0);
-                            if let (Some(path),Some(image)) = (&self.selected_file, &self.selected_img) {
-                                let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("不明");
-                                ui.label(format!("ファイル名: {file_name}"));
-                                ui.label(format!("画像サイズ: {} * {} px",image.width(),image.height()));
-                                if let Some(format) = self.selected_img_format {
-                                    ui.label(format!("画像形式: {format:?}"));
-                                }
-                                match std::fs::metadata(path) {Ok(metadata) => {
-                                    let file_size_kb = metadata.len() as f64 /1024.0;
-                                    ui.label(format!("ファイル容量: {file_size_kb:.1} kB"));
-                                }Err(_) => {
-                                    ui.label("画像が選択されていません");
-                                }}
-                            }
+                        ui.vertical(|ui| {
+                            let image_info_height = 130.0;
+                            let group_spacing = 8.0;
+                            let metadata_height = (preview_height - image_info_height - group_spacing).max(100.0);
+
+                            ui.group(|ui|{
+                                ui.set_width(info_width);
+                                ui.set_height(image_info_height);
+                                ui.vertical(|ui|{
+                                    ui.heading("画像情報");
+                                    ui.add_space(8.0);
+                                    if let (Some(path),Some(image)) = (&self.selected_file, &self.selected_img) {
+                                        let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("不明");
+                                        ui.label(format!("ファイル名: {file_name}"));
+                                        ui.label(format!("画像サイズ: {} * {} px",image.width(),image.height()));
+                                        if let Some(format) = self.selected_img_format {
+                                            ui.label(format!("画像形式: {format:?}"));
+                                        }
+                                        match std::fs::metadata(path) {Ok(metadata) => {
+                                            let file_size_kb = metadata.len() as f64 /1024.0;
+                                            ui.label(format!("ファイル容量: {file_size_kb:.1} kB"));
+                                        }Err(_) => {
+                                            ui.label("画像が選択されていません");
+                                        }}
+                                    }
+                                });
+                            });
+
+                                ui.add_space(group_spacing);
+
+                                //metadata表示
+                                ui.group(|ui|{
+                                    ui.set_width(info_width);
+                                    ui.set_height(metadata_height);
+
+                                    ui.vertical(|ui|{
+                                        ui.heading("メタデータ");
+                                        ui.add_space(6.0);
+
+                                        let scroll_height = (metadata_height - 45.0).max(50.0);
+
+                                        egui::ScrollArea::vertical()
+                                        .id_salt("metadata_scroll")
+                                        .max_height(scroll_height)
+                                        .auto_shrink([false, false])
+                                        .show(ui, |ui| {
+                                            if self.metadata.is_empty(){
+                                            ui.label("メタデータはありません");
+                                            } else {
+                                                for (name, value) in &self.metadata{
+                                                    ui.label(egui::RichText::new(name).strong(),);
+                                                    ui.add(egui::Label::new(value).wrap());
+                                                    ui.separator();
+                                                }
+                                            }
+                                        });
+                                    });
+                                });
                         });
-                    })
                 });
-                // 画像を開く
-                if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
+
                 // selcet image format
                 egui::ComboBox::from_label("変換形式")
                 .selected_text(self.selected_format.extension())

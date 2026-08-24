@@ -95,3 +95,17 @@ pub fn save_ico(image: &DynamicImage, output_path: &Path) -> image::ImageResult<
     let output_file = File::create(output_path)?;
     IcoEncoder::new(output_file).encode_images(&frames)
 }
+
+pub fn read_metadata(
+    input_path: &Path,
+) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
+    let exiftool = ExifTool::new();
+    let tags = exiftool.extract_info(input_path)?;
+
+    let metadata = tags
+        .into_iter()
+        .map(|tag| (tag.description, tag.print_value))
+        .collect();
+
+    Ok(metadata)
+}
