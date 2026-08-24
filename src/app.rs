@@ -252,8 +252,7 @@ impl eframe::App for MyApp {
                 if convert_button.clicked()
 
                 && let Some(image) = &self.selected_img {
-                    self.status_kind = StatusKind::Processing;
-                    self.status_message = "画像を変換中".to_string();
+
                     let extension = self.selected_format.extension();
                     let default_name = format!("converted.{extension}");
 
@@ -262,6 +261,8 @@ impl eframe::App for MyApp {
                     .set_file_name(&default_name)
                     .save_file()
                     {
+                        self.status_kind = StatusKind::Processing;
+                        self.status_message = "画像を変換中".to_string();
                         let save_result = save_image(image, &output_path, self.selected_format,);
                         match save_result {
                             Ok(()) => {
@@ -270,6 +271,7 @@ impl eframe::App for MyApp {
                                         match remove_tags(output_path_str) {
                                             Ok(()) => {
                                                 let message = format!("画像を変換し、メタデータを消去しました: {}",output_path.display());
+                                                self.status_kind = StatusKind::Success;
                                                 self.status_message = message;
                                             }Err(error) => {
                                                 let message = format!("画像は変換しましたが、メタデータの消去に失敗しました: {error}");
