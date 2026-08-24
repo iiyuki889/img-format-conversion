@@ -107,6 +107,17 @@ impl MyApp {
             }
         }
     }
+
+    fn clear_image(&mut self) {
+        self.selected_file = None;
+        self.texture = None;
+        self.selected_img = None;
+        self.selected_img_format = None;
+        self.metadata.clear();
+
+        self.status_kind = StatusKind::Info;
+        self.status_message = "現在の画像を解除しました".to_string();
+    }
 }
 
 impl eframe::App for MyApp {
@@ -147,7 +158,15 @@ impl eframe::App for MyApp {
                                 }
 
                             // 画像を開く
-                            if ui.button("Open file").clicked() {self.open_image(ui.ctx());}
+                            ui.horizontal(|ui| {
+                                if ui.button("画像を開く").clicked() {
+                                    self.open_image(ui.ctx());
+                                }
+                                let clear_enabled =self.selected_img.is_some();
+                                let clear_button = ui.add_enabled(clear_enabled,egui::Button::new("選択を解除"),);
+                                if clear_button.clicked() {self.clear_image();
+                                }
+                            });
                         });
                     });
 
