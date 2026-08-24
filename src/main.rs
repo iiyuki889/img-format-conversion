@@ -8,11 +8,10 @@ use app::{MyApp, setup_fonts};
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-        .with_inner_size([800.0, 570.0])
-        .with_resizable(false)
-        .with_maximize_button(false)
-        .with_icon(load_icon()
-    ),
+            .with_inner_size([800.0, 570.0])
+            .with_resizable(false)
+            .with_maximize_button(false)
+            .with_icon(load_icon()),
         ..Default::default()
     };
 
