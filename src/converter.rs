@@ -1,11 +1,15 @@
 use exiftool_rs::ExifTool;
 use image::{
-    DynamicImage, ExtendedColorType, ImageFormat,
-    codecs::ico::{IcoEncoder, IcoFrame},
+    DynamicImage, ExtendedColorType, ImageDecoder, ImageEncoder, ImageFormat,
+    codecs::{
+        ico::{IcoEncoder, IcoFrame},
+        jpeg::JpegEncoder,
+    },
     imageops::FilterType,
 };
+use little_exif::{ifd::ExifTagGroup, metadata::Metadata};
 use std::{fs::File, path::Path};
-pub const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "ico"];
+pub const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "ico"];
 const ICO_SIZES: &[u32] = &[16, 24, 32, 48, 64, 128, 256];
 
 #[derive(Default, PartialEq, Clone, Copy)]
@@ -14,7 +18,6 @@ pub enum ConvertFormat {
     Jpeg,
     Png,
     WebP,
-    Gif,
     Ico,
 }
 
@@ -24,7 +27,6 @@ impl ConvertFormat {
             Self::Jpeg => "jpg",
             Self::Png => "png",
             Self::WebP => "webp",
-            Self::Gif => "gif",
             Self::Ico => "ico",
         }
     }
@@ -34,7 +36,6 @@ impl ConvertFormat {
             Self::Jpeg => ImageFormat::Jpeg,
             Self::Png => ImageFormat::Png,
             Self::WebP => ImageFormat::WebP,
-            Self::Gif => ImageFormat::Gif,
             Self::Ico => ImageFormat::Ico,
         }
     }
@@ -52,25 +53,49 @@ pub fn save_image(
     }
 }
 
-pub fn copy_metadata(
+pub fn save_jpeg_with_metadata(
+    image: &DynamicImage,
     input_path: &Path,
     output_path: &Path,
     remove_gps: bool,
-) -> Result<u32, Box<dyn std::error::Error>> {
-    let mut exiftool = ExifTool::new();
-    let copied_count = exiftool.set_new_values_from_file(input_path, None)?;
-    if remove_gps {
-        let input_tags = exiftool.extract_info(input_path)?;
-        for tag in input_tags {
-            if tag.name.starts_with("GPS") {
-                let tag_name = format!("GPS:{}", tag.name);
-                exiftool.set_new_value(&tag_name, None);
-            }
-        }
+) -> Result<(), Box<dyn std::error::Error>> {
+    let reader = image::ImageReader::open(input_path)?.with_guessed_format()?;
+    let mut decoder = reader.into_decoder()?;
+    let exif = decoder.exif_metadata()?;
+    let icc_profile = decoder.icc_profile()?;
+    let output_file = File::create(output_path)?;
+    let mut encoder = JpegEncoder::new(output_file);
+
+    if let Some(exif) = exif {
+        encoder.set_exif_metadata(exif)?;
     }
 
-    exiftool.write_info(output_path, output_path)?;
-    Ok(copied_count)
+    if let Some(icc_profile) = icc_profile {
+        encoder.set_icc_profile(icc_profile)?;
+    }
+    let rgb_image = image.to_rgb8();
+
+    encoder.encode(
+        &rgb_image.as_raw(),
+        rgb_image.width(),
+        rgb_image.height(),
+        ExtendedColorType::Rgb8,
+    )?;
+    if remove_gps {
+        remove_gps_metadata(output_path)?;
+    }
+    Ok(())
+}
+
+fn remove_gps_metadata(output_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut metadata = Metadata::new_from_path(output_path)?;
+
+    for tag_id in 0x0000..=0x001f {
+        metadata.remove_tag_by_hex_group(tag_id, ExifTagGroup::GPS);
+    }
+    metadata.remove_tag_by_hex_group(0x8825, ExifTagGroup::GENERIC);
+    metadata.write_to_file(output_path)?;
+    Ok(())
 }
 
 pub fn save_ico(image: &DynamicImage, output_path: &Path) -> image::ImageResult<()> {

@@ -1,4 +1,6 @@
-use crate::converter::{ConvertFormat, IMAGE_EXTENSIONS, copy_metadata, read_metadata, save_image};
+use crate::converter::{
+    ConvertFormat, IMAGE_EXTENSIONS, read_metadata, save_image, save_jpeg_with_metadata,
+};
 use eframe::egui;
 use image::ImageFormat;
 use std::path::PathBuf;
@@ -242,10 +244,15 @@ impl eframe::App for MyApp {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Jpeg, "jpg");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Png, "png");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
-                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Gif, "gif");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Ico, "ico");});
-                    ui.checkbox(&mut self.remove_metadata_enabled,"変換後にGPS関連のメタデータを引き継がない",
-                );
+
+                    let metadata_copy_enabled = self.selected_format == ConvertFormat::Jpeg;
+                    ui.add_enabled_ui(metadata_copy_enabled, |ui|{
+                    ui.checkbox(&mut self.remove_metadata_enabled, "GPS関連のメタデータは引き継がない");
+                    });
+                    if !metadata_copy_enabled {
+                        ui.label("メタデータの引継ぎはJPEGのみ対応しています");
+                    }
 
                 let convert_enabled = self.selected_img.is_some();
                 let convert_button = ui.add_enabled(convert_enabled, egui::Button::new("変換開始"));
@@ -263,47 +270,52 @@ impl eframe::App for MyApp {
                     {
                         self.status_kind = StatusKind::Processing;
                         self.status_message = "画像を変換中".to_string();
-                        let save_result = save_image(image, &output_path, self.selected_format,);
-                        match save_result {
-                            Ok(()) => {
-                                let Some(input_path) = self.selected_file.as_deref() else {
-                                    self.status_kind = StatusKind::Error;
-                                    self.status_message = "変換元のパスを取得できませんでした".to_string();
-                                    return;
-                                };
 
-                                match copy_metadata(input_path, &output_path, self.remove_metadata_enabled) {
-                                    Ok(copied_count) => {
-                                        self.status_kind = StatusKind::Success;
+                        let Some(input_path) = self.selected_file.as_deref() else {
+                            self.status_kind = StatusKind::Error;
+                            self.status_message = "変換元のパスを取得できませんでした".to_string();
+                            return;
+                        };
 
-                                        if self.remove_metadata_enabled{
-                                            self.status_message = format!(
-                                                "画像を変換し、メタデータを引き継ぎました(GPSを除外 {}タグ。: {}",
-                                                copied_count,
-                                                output_path.display()
-                                            );
-                                        }else {
-                                            self.status_message = format!(
-                                                "画像を変換し、メタデータを引き継ぎました({}タグ): {}",
-                                                copied_count,
-                                                output_path.display()
-                                            );
+                        let save_result: Result<(), Box<dyn std::error::Error>> =
+                            if self.selected_format == ConvertFormat::Jpeg {
+                                save_jpeg_with_metadata(
+                                    image,
+                                    input_path,
+                                    &output_path,
+                                    self.remove_metadata_enabled
+                                )
+                            }else {
+                                save_image(image, &output_path, self.selected_format)
+                                .map_err(|error|{Box::new(error) as Box<dyn std::error::Error>})
+                            };
+                            match save_result {
+                                Ok(_) => {
+                                    self.status_kind = StatusKind::Success;
+                                    if self.selected_format == ConvertFormat::Jpeg {
+                                            if self.remove_metadata_enabled{
+                                                self.status_message = format!(
+                                                    "JPEG画像を変換し、メタデータを引き継ぎました(GPSを除外)。: {}",
+                                                    output_path.display()
+                                                );
+                                            }else {
+                                                self.status_message = format!(
+                                                    "JPEG画像を変換し、メタデータを引き継ぎました: {}",
+                                                    output_path.display()
+                                                );
+                                            }
+                                        } else {
+                                            self.status_message = format!("画像を変換しました（メタデータの引継ぎはJPEGのみ対応):{}", output_path.display());
                                         }
-                                    }
-                                    Err(error) => {
-                                        self.status_kind = StatusKind::Error;
+                                }
+                                Err(error) => {
+                                    self.status_kind = StatusKind::Error;
                                         self.status_message = format!("画像は保存しましたが、メタデータの引継ぎに失敗しました。: {error}");
                                     }
-                                }
-                            }
-                            Err(error) => {
-                                self.status_kind = StatusKind::Error;
-                                self.status_message =
-                                    format!("画像の変換に失敗しました: {error}");
                             }
                         }
-                    }
                 }
+
                 if !self.status_message.is_empty() {
                     ui.separator();
                     ui.horizontal(|ui| {
