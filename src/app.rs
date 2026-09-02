@@ -38,6 +38,8 @@ pub fn setup_fonts(ctx: &egui::Context) {
 #[derive(Default)]
 pub struct MyApp {
     selected_file: Option<PathBuf>,
+    selected_files: Vec<PathBuf>,
+    selected_index: usize,
     texture: Option<egui::TextureHandle>,
     selected_format: ConvertFormat,
     selected_img: Option<image::DynamicImage>,
@@ -60,12 +62,33 @@ enum StatusKind {
 
 impl MyApp {
     fn open_image(&mut self, ctx: &egui::Context) {
-        let Some(path) = rfd::FileDialog::new()
+        let Some(paths) = rfd::FileDialog::new()
             .add_filter("Image", IMAGE_EXTENSIONS)
-            .pick_file()
+            .pick_files()
         else {
             return;
         };
+
+        if paths.is_empty() {
+            return;
+        }
+
+        self.selected_files = paths;
+        self.selected_index = 0;
+
+        if let Some(first_path) = self.selected_files.first().cloned() {
+            self.load_image_from_path(ctx, first_path);
+        }
+
+        self.status_kind = StatusKind::Info;
+        self.status_message = format!("{}枚の画像を選択しました", self.selected_files.len());
+    }
+
+    fn selected_image(&mut self, ctx: &egui::Context, index: usize) {
+        let Some(path) = self.selected_files.get(index).cloned() else {
+            return;
+        };
+        self.selected_index = index;
         self.load_image_from_path(ctx, path);
     }
 
@@ -112,6 +135,8 @@ impl MyApp {
 
     fn clear_image(&mut self) {
         self.selected_file = None;
+        self.selected_files.clear();
+        self.selected_index = 0;
         self.texture = None;
         self.selected_img = None;
         self.selected_img_format = None;
@@ -157,7 +182,26 @@ impl eframe::App for MyApp {
                                 ui.painter().image(texture.id(),image_rect,egui::Rect::from_min_max(egui::pos2(0.0, 0.0),egui::pos2(1.0,1.0),),egui::Color32::WHITE,);
                             }else {
                                 ui.painter().text(rect.center(),egui::Align2::CENTER_CENTER,"画像をドロップしてください",egui::FontId::proportional(18.0),egui::Color32::GRAY,);
+                            }
+
+                            ui.horizontal(|ui| {
+                                let image_count = self.selected_files.len();
+                                let previous_enabled = image_count > 1 && self.selected_index >0;
+
+                                if ui.add_enabled(previous_enabled, egui::Button::new("前へ")).clicked() {
+                                    self.selected_image(ui.ctx(), self.selected_index -1);
                                 }
+
+                                if image_count > 0 {
+                                    ui.label(format!("{}/{}",self.selected_index + 1, image_count));
+                                }
+
+                                let next_enabled = image_count > 1 && self.selected_index + 1 < image_count;
+
+                                if ui.add_enabled(next_enabled, egui::Button::new("次へ")).clicked(){
+                                    self.selected_image(ui.ctx(), self.selected_index + 1);
+                                }
+                            });
 
                             // 画像を開く
                             ui.horizontal(|ui| {
@@ -187,6 +231,12 @@ impl eframe::App for MyApp {
                                 ui.vertical(|ui|{
                                     ui.heading("画像情報");
                                     ui.add_space(8.0);
+
+                                    if !self.selected_files.is_empty(){
+                                        ui.label(format!(
+                                            "選択枚数: {}枚",self.selected_files.len())
+                                        );
+                                    }
                                     if let (Some(path),Some(image)) = (&self.selected_file, &self.selected_img) {
                                         let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("不明");
                                         ui.label(format!("ファイル名: {file_name}"));
