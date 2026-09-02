@@ -37,6 +37,7 @@ pub fn setup_fonts(ctx: &egui::Context) {
 
 #[derive(Default)]
 pub struct MyApp {
+    active_tab: AppTab,
     selected_file: Option<PathBuf>,
     selected_files: Vec<PathBuf>,
     selected_index: usize,
@@ -50,6 +51,13 @@ pub struct MyApp {
     status_message: String,
     status_kind: StatusKind,
     metadata: Vec<(String, String)>,
+}
+
+#[derive(Default, PartialEq, Clone, Copy)]
+enum AppTab {
+    #[default]
+    Convert,
+    Rename,
 }
 
 #[derive(Default, PartialEq)]
@@ -163,6 +171,65 @@ impl eframe::App for MyApp {
                 // title
                 ui.heading("Image format converter tool");
                 ui.add_space(12.0);
+
+                ui.horizontal(|ui|{
+                    ui.selectable_value(&mut self.active_tab, AppTab::Convert, "フォーマット変換");
+                    ui.selectable_value(&mut self.active_tab, AppTab::Rename, "一括リネーム");
+                });
+
+                ui.separator();
+                ui.add_space(8.0);
+
+                if self.active_tab == AppTab::Rename {
+                    ui.heading("一括リネーム");
+                    ui.add_space(12.0);
+
+                    ui.group(|ui| {
+                        ui.set_min_width(500.0);
+                        ui.heading("リネーム対象");
+                        ui.add_space(8.0);
+                        ui.label("ファイルはまだ選択されていません");
+
+                        ui.add_space(8.0);
+                        ui.add_enabled(false, egui::Button::new("ファイルを選択"));
+                    });
+
+                    ui.add_space(12.0);
+
+                    ui.group(|ui| {
+                        ui.set_min_width(500.0);
+                        ui.heading("リネーム設定");
+                        ui.add_space(8.0);
+
+                        ui.horizontal(|ui|{
+                            ui.label("新しいファイル");
+                            ui.add_enabled(false, egui::TextEdit::singleline(&mut String::new()).hint_text("例: photo"));
+                        });
+
+                        ui.horizontal(|ui|{
+                            ui.label("開始番号");
+                            ui.add_enabled(false, egui::DragValue::new(&mut 1));
+                        });
+
+                        ui.checkbox(&mut false, "ファイル名の末尾に連番をつける");
+                    });
+                    ui.add_space(12.0);
+                    ui.group(|ui| {
+                        ui.set_min_width(500.0);
+
+                        ui.heading("変更後のプレビュー");
+                        ui.add_space(8.0);
+                        ui.label("例: photo_001.jpg");
+                        ui.label("例: photo_002.jpg");
+                        ui.label("例: photo_003.jpg");
+                    });
+
+                    ui.add_space(12.0);
+
+                    ui.add_enabled(false, egui::Button::new("一括リネーム"));
+                    return;
+                }
+
                 let available_width = ui.available_width();
                 let preview_width = (available_width * 0.62).clamp(300.0, 500.0);
                 let preview_height = (preview_width * 0.75).clamp(100.0, 500.0);
