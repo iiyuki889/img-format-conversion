@@ -1,6 +1,7 @@
 use crate::converter::{
     ConvertFormat, IMAGE_EXTENSIONS, read_metadata, save_image, save_jpeg_with_metadata,
 };
+use crate::rename::{build_custom_rename_plan, build_exif_rename_plan, execute_rename_plan};
 use eframe::egui;
 use image::ImageFormat;
 use std::path::PathBuf;
@@ -295,19 +296,54 @@ impl eframe::App for MyApp {
 
                     ui.add_space(12.0);
 
-                    let setting_ready = match self.rename_mode {
+                    let settings_ready = match self.rename_mode {
                         RenameMode::ExifTemplate => {
-                            !self.rename_files.is_empty() && (!self.rename_location_enabled || !self.rename_location.trim().is_empty())
-                        },
+                            !self.rename_files.is_empty()
+                                && (!self.rename_location_enabled
+                                    || !self.rename_location.trim().is_empty())
+                        }
                         RenameMode::Custom => {
-                            !self.rename_files.is_empty() && !self.rename_custom_name.trim().is_empty()
+                            !self.rename_files.is_empty()
+                                && !self.rename_custom_name.trim().is_empty()
                         }
                     };
 
-                    ui.add_enabled(false && setting_ready, egui::Button::new("一括リネームを実行"));
-                    ui.label("リネーム処理は次の段階で有効にします");
+                    let rename_button = ui.add_enabled(
+                        settings_ready,
+                        egui::Button::new("一括リネームを実行"),
+                    );
 
-                    if !self.rename_status_message.is_empty(){
+                    if rename_button.clicked() {
+                        let result = match self.rename_mode {
+                            RenameMode::ExifTemplate => {
+                                let location = if self.rename_location_enabled {
+                                    Some(self.rename_location.as_str())
+                                } else {
+                                    None
+                                };
+
+                                build_exif_rename_plan(&self.rename_files, location)
+                            }
+                            RenameMode::Custom => build_custom_rename_plan(
+                                &self.rename_files,
+                                &self.rename_custom_name,
+                            ),
+                        };
+
+                        match result.and_then(|plans| execute_rename_plan(&plans)) {
+                            Ok(count) => {
+                                self.rename_files.clear();
+                                self.rename_status_message =
+                                    format!("{count}個のファイルをリネームしました");
+                            }
+                            Err(error) => {
+                                self.rename_status_message =
+                                    format!("リネームできません: {error}");
+                            }
+                        }
+                    }
+
+                    if !self.rename_status_message.is_empty() {
                         ui.separator();
                         ui.colored_label(egui::Color32::LIGHT_BLUE, &self.rename_status_message);
                     }
