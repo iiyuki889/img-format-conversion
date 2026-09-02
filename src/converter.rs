@@ -76,7 +76,7 @@ pub fn save_jpeg_with_metadata(
     let rgb_image = image.to_rgb8();
 
     encoder.encode(
-        &rgb_image.as_raw(),
+        rgb_image.as_raw(),
         rgb_image.width(),
         rgb_image.height(),
         ExtendedColorType::Rgb8,
@@ -98,7 +98,7 @@ fn remove_gps_metadata(output_path: &Path) -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
-pub fn save_ico(image: &DynamicImage, output_path: &Path) -> image::ImageResult<()> {
+fn save_ico(image: &DynamicImage, output_path: &Path) -> image::ImageResult<()> {
     let mut frames = Vec::with_capacity(ICO_SIZES.len());
     for &size in ICO_SIZES {
         let resized_image = image

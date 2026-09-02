@@ -10,7 +10,11 @@ fn load_texture(ctx: &egui::Context, image: &image::DynamicImage) -> egui::Textu
     let size = [rgba.width() as usize, rgba.height() as usize];
     let color_image = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
 
-    ctx.load_texture("sekected-img", color_image, egui::TextureOptions::default())
+    ctx.load_texture(
+        "selected-image",
+        color_image,
+        egui::TextureOptions::default(),
+    )
 }
 
 // -------- GUI --------
