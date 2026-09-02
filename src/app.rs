@@ -193,6 +193,66 @@ impl MyApp {
         self.rename_status_message =
             format!("{}個のファイルを選択しました", self.rename_files.len());
     }
+
+    fn open_rename_folder(&mut self) {
+        let Some(folder_path) = rfd::FileDialog::new().pick_folder() else {
+            return;
+        };
+
+        let directory = match std::fs::read_dir(&folder_path) {
+            Ok(directory) => directory,
+            Err(error) => {
+                self.rename_status_message = format!("フォルダーを開けませんでした: {error}");
+                return;
+            }
+        };
+
+        let mut paths = Vec::new();
+
+        for entry in directory {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    self.rename_status_message =
+                        format!("フォルダーの読み込みに失敗しました: {error}");
+                    return;
+                }
+            };
+
+            let path = entry.path();
+
+            if !path.is_file() {
+                continue;
+            }
+
+            let supported = path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    IMAGE_EXTENSIONS
+                        .iter()
+                        .any(|supported| extension.eq_ignore_ascii_case(supported))
+                });
+
+            if supported {
+                paths.push(path);
+            }
+        }
+
+        paths.sort();
+
+        if paths.is_empty() {
+            self.rename_files.clear();
+            self.rename_status_message = format!("対応画像がありません: {}", folder_path.display());
+            return;
+        }
+
+        self.rename_files = paths;
+        self.rename_status_message = format!(
+            "{}個の画像をフォルダーから読み込みました",
+            self.rename_files.len()
+        );
+    }
 }
 
 impl eframe::App for MyApp {
@@ -229,6 +289,10 @@ impl eframe::App for MyApp {
                         ui.horizontal(|ui| {
                             if ui.button("ファイルを複数選択").clicked(){
                                 self.open_rename_files();
+                            }
+
+                            if ui.button("フォルダーを選択").clicked() {
+                                self.open_rename_folder();
                             }
 
                             let clear_enabled = !self.rename_files.is_empty();
