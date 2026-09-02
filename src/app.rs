@@ -55,6 +55,13 @@ pub struct MyApp {
     status_message: String,
     status_kind: StatusKind,
     metadata: Vec<(String, String)>,
+
+    rename_files: Vec<PathBuf>,
+    rename_mode: RenameMode,
+    rename_location_enabled: bool,
+    rename_location: String,
+    rename_custom_name: String,
+    rename_status_message: String,
 }
 
 #[derive(Default, PartialEq, Clone, Copy)]
@@ -72,6 +79,13 @@ enum StatusKind {
     Processing,
     Success,
     Error,
+}
+
+#[derive(Default, PartialEq, Clone, Copy)]
+enum RenameMode {
+    #[default]
+    ExifTemplate,
+    Custom,
 }
 
 impl MyApp {
@@ -161,6 +175,23 @@ impl MyApp {
         self.status_kind = StatusKind::Info;
         self.status_message = "現在の画像を解除しました".to_string();
     }
+
+    fn open_rename_files(&mut self) {
+        let Some(paths) = rfd::FileDialog::new()
+            .add_filter("Image", IMAGE_EXTENSIONS)
+            .pick_files()
+        else {
+            return;
+        };
+
+        if paths.is_empty() {
+            return;
+        }
+
+        self.rename_files = paths;
+        self.rename_status_message =
+            format!("{}個のファイルを選択しました", self.rename_files.len());
+    }
 }
 
 impl eframe::App for MyApp {
@@ -184,6 +215,7 @@ impl eframe::App for MyApp {
                 ui.separator();
                 ui.add_space(8.0);
 
+                // リネームのタブの切り替え
                 if self.active_tab == AppTab::Rename {
                     ui.heading("一括リネーム");
                     ui.add_space(12.0);
@@ -192,10 +224,42 @@ impl eframe::App for MyApp {
                         ui.set_min_width(500.0);
                         ui.heading("リネーム対象");
                         ui.add_space(8.0);
-                        ui.label("ファイルはまだ選択されていません");
+
+                        ui.horizontal(|ui| {
+                            if ui.button("ファイルを複数選択").clicked(){
+                                self.open_rename_files();
+                            }
+
+                            let clear_enabled = !self.rename_files.is_empty();
+
+                            if ui.add_enabled(clear_enabled, egui::Button::new("選択を解除")).clicked(){
+                                self.rename_files.clear();
+                                self.rename_status_message.clear();
+                            }
+                        });
 
                         ui.add_space(8.0);
-                        ui.add_enabled(false, egui::Button::new("ファイルを選択"));
+
+                        if self.rename_files.is_empty(){
+                            ui.label("ファイルはまた選択されていません");
+                        } else {
+                            ui.label(format!("選択数: {}個", self.rename_files.len()));
+
+                            egui::ScrollArea::vertical()
+                            .id_salt("rename_file_list")
+                            .max_height(160.0)
+                            .show(ui, |ui|{
+                                for path in &self.rename_files{
+                                    let file_name = path
+                                    .file_name()
+                                    .and_then(|name| name
+                                        .to_str())
+                                        .unwrap_or("不明");
+
+                                    ui.label(file_name);
+                                }
+                            });
+                        }
                     });
 
                     ui.add_space(12.0);
@@ -205,32 +269,48 @@ impl eframe::App for MyApp {
                         ui.heading("リネーム設定");
                         ui.add_space(8.0);
 
-                        ui.horizontal(|ui|{
-                            ui.label("新しいファイル");
-                            ui.add_enabled(false, egui::TextEdit::singleline(&mut String::new()).hint_text("例: photo"));
-                        });
+                        ui.radio_value(&mut self.rename_mode, RenameMode::ExifTemplate, "exifから名前を作成");
 
-                        ui.horizontal(|ui|{
-                            ui.label("開始番号");
-                            ui.add_enabled(false, egui::DragValue::new(&mut 1));
-                        });
+                        ui.label("形式: YYYYMMDD_撮影カメラ_連番.format");
 
-                        ui.checkbox(&mut false, "ファイル名の末尾に連番をつける");
-                    });
-                    ui.add_space(12.0);
-                    ui.group(|ui| {
-                        ui.set_min_width(500.0);
-
-                        ui.heading("変更後のプレビュー");
                         ui.add_space(8.0);
-                        ui.label("例: photo_001.jpg");
-                        ui.label("例: photo_002.jpg");
-                        ui.label("例: photo_003.jpg");
+
+                        ui.add_enabled_ui(self.rename_mode == RenameMode::ExifTemplate, |ui|{
+                            ui.horizontal(|ui|{
+                                ui.checkbox(&mut self.rename_location_enabled, "場所を追加");
+                            });
+
+                            ui.add_enabled(self.rename_location_enabled, egui::TextEdit::singleline(&mut self.rename_location).hint_text("例: 東京"));
+                            if self.rename_location_enabled{
+                                ui.label("形式: YYYYMMDD_撮影カメラ_連番.format");
+                            }
+                        });
+                        ui.add_space(12.0);
+                        ui.radio_value(&mut self.rename_mode, RenameMode::Custom, "任意の名前を使用");
+                        ui.add_enabled(self.rename_mode == RenameMode::Custom, egui::TextEdit::singleline(&mut self.rename_custom_name).hint_text("例: 旅行写真"));
+                        if self.rename_mode == RenameMode::Custom {
+                            ui.label("形式: 任意名_連番.format");
+                        }
                     });
 
                     ui.add_space(12.0);
 
-                    ui.add_enabled(false, egui::Button::new("一括リネーム"));
+                    let setting_ready = match self.rename_mode {
+                        RenameMode::ExifTemplate => {
+                            !self.rename_files.is_empty() && (!self.rename_location_enabled || !self.rename_location.trim().is_empty())
+                        },
+                        RenameMode::Custom => {
+                            !self.rename_files.is_empty() && !self.rename_custom_name.trim().is_empty()
+                        }
+                    };
+
+                    ui.add_enabled(false && setting_ready, egui::Button::new("一括リネームを実行"));
+                    ui.label("リネーム処理は次の段階で有効にします");
+
+                    if !self.rename_status_message.is_empty(){
+                        ui.separator();
+                        ui.colored_label(egui::Color32::LIGHT_BLUE, &self.rename_status_message);
+                    }
                     return;
                 }
 
