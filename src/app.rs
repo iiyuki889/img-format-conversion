@@ -45,6 +45,8 @@ pub struct MyApp {
     selected_img: Option<image::DynamicImage>,
     selected_img_format: Option<ImageFormat>,
     remove_metadata_enabled: bool,
+    custom_filename_enabled: bool,
+    output_filename: String,
     status_message: String,
     status_kind: StatusKind,
     metadata: Vec<(String, String)>,
@@ -137,6 +139,8 @@ impl MyApp {
         self.selected_file = None;
         self.selected_files.clear();
         self.selected_index = 0;
+        self.output_filename.clear();
+        self.custom_filename_enabled = false;
         self.texture = None;
         self.selected_img = None;
         self.selected_img_format = None;
@@ -294,7 +298,28 @@ impl eframe::App for MyApp {
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Jpeg, "jpg");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::Png, "png");
                     ui.selectable_value(&mut self.selected_format, ConvertFormat::WebP, "webp");
-                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Ico, "ico");});
+                    ui.selectable_value(&mut self.selected_format, ConvertFormat::Ico, "ico");
+                });
+
+                ui.horizontal(|ui|{
+                    let checkbox = ui.checkbox(&mut self.custom_filename_enabled, "保存名を指定");
+
+                    if checkbox.changed()
+                    && self.custom_filename_enabled
+                    && self.output_filename.is_empty()
+                    && let Some(path) = &self.selected_file
+                    && let Some(file_stem) = path.file_stem()
+                    && let Some(file_stem) = file_stem.to_str()
+                    {
+                        self.output_filename = file_stem.to_string();
+                    }
+
+                    ui.add_enabled(self.custom_filename_enabled, egui::TextEdit::singleline(&mut self.output_filename,).hint_text("保存名"));
+
+                    if self.custom_filename_enabled {
+                        ui.label(format!(".{}", self.selected_format.extension()));
+                    }
+                });
 
                     let metadata_copy_enabled = self.selected_format == ConvertFormat::Jpeg;
                     ui.add_enabled_ui(metadata_copy_enabled, |ui|{
@@ -311,7 +336,13 @@ impl eframe::App for MyApp {
                 && let Some(image) = &self.selected_img {
 
                     let extension = self.selected_format.extension();
-                    let default_name = format!("converted.{extension}");
+                    let entered_name = self.output_filename.trim();
+
+                    let default_name = if self.custom_filename_enabled && !entered_name.is_empty(){
+                        format!("{entered_name}.{extension}")
+                    }else {
+                        format!("converted.{extension}")
+                    };
 
                     if let Some(output_path) = rfd::FileDialog::new()
                     .add_filter("変換後の画像", &[extension])
