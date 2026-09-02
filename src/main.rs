@@ -2,6 +2,7 @@
 
 mod app;
 mod converter;
+mod rename;
 
 use app::{MyApp, setup_fonts};
 
