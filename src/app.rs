@@ -135,6 +135,7 @@ impl MyApp {
             Ok(reader) => reader,
             Err(error) => {
                 self.status_message = format!("画像を判定できませんでした。: {error}");
+                self.status_kind = StatusKind::Error;
                 return;
             }
         };
@@ -259,10 +260,42 @@ impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui|{
-                // ドロップファイルの取得
-                let dropped_path = ui.ctx().input(|input| {input.raw.dropped_files.first().map(|file| file.path().to_path_buf())});
-                if let Some(path) = dropped_path{
-                    self.load_image_from_path(ui.ctx(), path);
+
+                    // ドロップファイルの取得
+                    let dropped_path = ui.ctx().input(|input| {
+                        input
+                        .raw
+                        .dropped_files
+                        .iter()
+                        .map(|file| file.path().to_path_buf())
+                    .filter(|path|{
+                        path.is_file() && path
+                        .extension()
+                        .and_then(|extension| extension.to_str())
+                        .is_some_and(|extension|{
+                        IMAGE_EXTENSIONS.iter()
+                        .any(|supported|extension.eq_ignore_ascii_case(supported))
+                        })
+                    })
+                    .collect::<Vec<PathBuf>>()
+                });
+
+                if !dropped_path.is_empty() {
+                    match self.active_tab {
+                        AppTab::Convert => {
+                            self.selected_files = dropped_path;
+                            self.selected_index = 0;
+
+                            if let Some(first_path) = self.selected_files.first().cloned() {
+                                self.load_image_from_path(ui.ctx(), first_path);
+                            }
+                        }
+
+                        AppTab::Rename => {
+                            self.rename_files = dropped_path;
+                            self.rename_status_message = format!("{}この画像を選択しました", self.rename_files.len());
+                        }
+                    }
                 }
                 // title
                 ui.heading("Image format converter tool");
