@@ -56,6 +56,7 @@ pub struct MyApp {
     status_message: String,
     status_kind: StatusKind,
     metadata: Vec<(String, String)>,
+    inhert_original_filename: bool,
 
     rename_files: Vec<PathBuf>,
     rename_mode: RenameMode,
@@ -90,6 +91,12 @@ enum RenameMode {
 }
 
 impl MyApp {
+    fn update_output_filename_from_path(&mut self, path: &std::path::Path) {
+        if let Some(file_stem) = path.file_stem().and_then(|name| name.to_str()) {
+            self.output_filename = file_stem.to_string();
+        }
+    }
+
     fn open_image(&mut self, ctx: &egui::Context) {
         let Some(paths) = rfd::FileDialog::new()
             .add_filter("Image", IMAGE_EXTENSIONS)
@@ -147,6 +154,9 @@ impl MyApp {
                 self.metadata = read_metadata(&path).unwrap_or_default();
                 self.texture = Some(load_texture(ctx, &image));
                 self.selected_file = Some(path.clone());
+                if self.inhert_original_filename {
+                    self.update_output_filename_from_path(&path);
+                }
                 self.selected_img = Some(image);
                 self.selected_img_format = image_format;
                 self.status_kind = StatusKind::Info;
@@ -169,6 +179,7 @@ impl MyApp {
         self.selected_index = 0;
         self.output_filename.clear();
         self.custom_filename_enabled = false;
+        self.inhert_original_filename = false;
         self.texture = None;
         self.selected_img = None;
         self.selected_img_format = None;
@@ -586,21 +597,19 @@ impl eframe::App for MyApp {
                 });
 
                 ui.horizontal(|ui|{
-                    let checkbox = ui.checkbox(&mut self.custom_filename_enabled, "保存名を指定");
+                    ui.checkbox(&mut self.custom_filename_enabled, "保存名を指定");
 
-                    if checkbox.changed()
-                    && self.custom_filename_enabled
-                    && self.output_filename.is_empty()
-                    && let Some(path) = &self.selected_file
-                    && let Some(file_stem) = path.file_stem()
-                    && let Some(file_stem) = file_stem.to_str()
-                    {
-                        self.output_filename = file_stem.to_string();
+                    let inherit_checkbox = ui.checkbox(&mut self.inhert_original_filename, "元の名前を引き継ぐ");
+
+                    if inherit_checkbox.changed() && self.inhert_original_filename && let Some(path) = self.selected_file.clone() {
+                        self.update_output_filename_from_path(&path);
                     }
 
-                    ui.add_enabled(self.custom_filename_enabled, egui::TextEdit::singleline(&mut self.output_filename,).hint_text("保存名"));
+                    let filename_enabled = self.custom_filename_enabled || self.inhert_original_filename;
 
-                    if self.custom_filename_enabled {
+                    ui.add_enabled(filename_enabled, egui::TextEdit::singleline(&mut self.output_filename).hint_text("保存名"));
+
+                    if filename_enabled {
                         ui.label(format!(".{}", self.selected_format.extension()));
                     }
                 });
@@ -622,7 +631,9 @@ impl eframe::App for MyApp {
                     let extension = self.selected_format.extension();
                     let entered_name = self.output_filename.trim();
 
-                    let default_name = if self.custom_filename_enabled && !entered_name.is_empty(){
+                    let filename_enabled = self.custom_filename_enabled || self.inhert_original_filename;
+
+                    let default_name = if filename_enabled && !entered_name.is_empty(){
                         format!("{entered_name}.{extension}")
                     }else {
                         format!("converted.{extension}")
